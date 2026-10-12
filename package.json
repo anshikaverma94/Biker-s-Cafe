@@ -1,0 +1,22 @@
+{
+  "name": "bikers-cafe-garba-night",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "dotenv": "^16.4.5",
+    "next": "14.2.33",
+    "razorpay": "^2.9.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
