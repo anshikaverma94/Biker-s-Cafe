@@ -65,7 +65,7 @@ export default function Home() {
       leadFiredRef.current = true;
       const leadId = genEventId('lead');
       leadIdRef.current = leadId;
-      trackStandardPixel('Lead', leadId, { content_name: 'Single Sanedo booking form' });
+      trackStandardPixel('Lead', leadId, { content_name: 'Garba Gone Single booking form' });
       const { fbp, fbc } = fbCookies();
       fetch('/api/lead', {
         method: 'POST',
@@ -153,7 +153,7 @@ export default function Home() {
       currency: orderInfo.currency,
       order_id: orderInfo.orderId,
       name: 'The Bikers Cafe',
-      description: 'Single Sanedo — Singles Only Garba Night',
+      description: 'Garba Gone Single — Singles Only Garba Night',
       prefill: { contact: '+91' + phone, email },
       theme: { color: '#D0262C' },
       handler: async (response) => {
@@ -223,7 +223,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Single Sanedo · Biker's Cafe &amp; Social Nxt</title>
+        <title>Garba Gone Single · Biker's Cafe &amp; Social Nxt</title>
         <link rel="icon" type="image/png" href="/assets/bikers-cafe-logo.png" />
         <link rel="apple-touch-icon" href="/assets/bikers-cafe-logo.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -268,7 +268,11 @@ export default function Home() {
             box-shadow:0 4px 0 #7A1519;
           }
         }
-        @media print{[data-noprint]{display:none!important}[data-print-root]{position:static!important;overflow:visible!important;background:#fff!important}}
+        @media print{
+          [data-noprint]{display:none!important}
+          [data-print-root]{position:static!important;overflow:visible!important;background:#fff!important}
+          *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+        }
       `}</style>
 
       <div data-noprint="1">
@@ -509,7 +513,7 @@ export default function Home() {
             <div style={{ background: '#141213', color: '#fff', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <img src="/assets/bikers-cafe-logo.png" alt="" style={{ width: 40, height: 40, borderRadius: '50%', display: 'block' }} />
-                <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontWeight: 700, fontSize: 16 }}>Single Sanedo</span><span style={{ fontSize: 13, opacity: .75 }}>Order {orderInfo?.orderId || ''}</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontWeight: 700, fontSize: 16 }}>Garba Gone Single</span><span style={{ fontSize: 13, opacity: .75 }}>Order {orderInfo?.orderId || ''}</span></div>
               </div>
               <button onClick={() => setStage('form')} aria-label="Close" style={{ background: 'transparent', border: 0, color: '#fff', fontSize: 24, cursor: 'pointer', width: 44, height: 44 }}>×</button>
             </div>
@@ -545,10 +549,6 @@ export default function Home() {
               <span style={{ background: '#2E8B3E', color: '#fff', fontWeight: 700, fontSize: 14, padding: '5px 12px', borderRadius: 999, letterSpacing: '.06em', textTransform: 'uppercase' }}>Payment successful · {inr(total)}</span>
               <h2 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 'clamp(36px,6vw,64px)', lineHeight: 1 }}>See you on the dance floor!</h2>
               <p style={{ margin: 0, fontSize: 18, color: '#DDD3CB' }}>Booking <strong style={{ color: '#E8A07C' }}>{bookingId}</strong> · {ticketSnapshot.length} {ticketSnapshot.length === 1 ? 'pass' : 'passes'} for {EVENT_DATE_LONG}</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 15 }}>
-                <span style={{ padding: '8px 14px', borderRadius: 999, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)' }}>{'✉ Passes emailed to ' + email}</span>
-                <span style={{ padding: '8px 14px', borderRadius: 999, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)' }}>Save this page or find it later at /my-booking with {bookingId} + your mobile</span>
-              </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
                 <button onClick={() => window.print()} style={{ height: 52, padding: '0 26px', border: 0, borderRadius: 999, background: '#E8A07C', color: '#141213', font: "700 17px 'Mukta',sans-serif", cursor: 'pointer' }}>Download passes (PDF)</button>
                 <button onClick={resetAll} style={{ height: 52, padding: '0 26px', border: '1.5px solid #E8A07C', borderRadius: 999, background: 'transparent', color: '#E8A07C', font: "600 17px 'Mukta',sans-serif", cursor: 'pointer' }}>Book another pass</button>
@@ -559,7 +559,7 @@ export default function Home() {
                 <div key={t.idx} style={{ display: 'flex', flexWrap: 'wrap', borderRadius: 18, overflow: 'hidden', background: '#FBF7F3', color: '#1E1A1B', boxShadow: '0 18px 40px rgba(0,0,0,.35)' }}>
                   <div style={{ flex: '1 1 380px', minWidth: 0, background: '#B3242A', color: '#FFF3EC', backgroundImage: 'radial-gradient(circle,rgba(255,255,255,.13) 1.4px,transparent 2px)', backgroundSize: '18px 18px', padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ fontSize: 13, letterSpacing: '.14em', textTransform: 'uppercase', color: '#F6CDB4', fontWeight: 600 }}>Biker's Cafe &amp; Social Nxt</span><span style={{ fontFamily: "'Rozha One',serif", fontSize: 32, lineHeight: 1.05 }}>Single Sanedo</span></div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ fontSize: 13, letterSpacing: '.14em', textTransform: 'uppercase', color: '#F6CDB4', fontWeight: 600 }}>Biker's Cafe &amp; Social Nxt</span><span style={{ fontFamily: "'Rozha One',serif", fontSize: 32, lineHeight: 1.05 }}>Garba Gone Single</span></div>
                       <img src="/assets/bikers-cafe-logo.png" alt="" style={{ width: 56, height: 56, borderRadius: '50%', display: 'block', flex: 'none', boxShadow: '0 0 0 2px #F6CDB4' }} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 14 }}>

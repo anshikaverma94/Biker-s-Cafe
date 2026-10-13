@@ -69,7 +69,7 @@ export default function CheckIn() {
   return (
     <>
       <Head>
-        <title>Check-in · Single Sanedo</title>
+        <title>Check-in · Garba Gone Single</title>
         <link rel="icon" type="image/png" href="/assets/bikers-cafe-logo.png" />
         <meta name="robots" content="noindex,nofollow" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -82,7 +82,7 @@ export default function CheckIn() {
       <main style={{ maxWidth: 480, margin: '0 auto', padding: '24px 16px 48px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <img src="/assets/bikers-cafe-logo.png" alt="" width={48} height={48} style={{ borderRadius: '50%', boxShadow: '0 0 0 2px #E8A07C' }} />
-          <div><div style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', color: '#CFC4BC' }}>Single Sanedo · Biker's Cafe</div>
+          <div><div style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', color: '#CFC4BC' }}>Garba Gone Single · Biker's Cafe</div>
           <h1 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 30, lineHeight: 1.1 }}>Entry check-in</h1></div>
         </header>
         <input type="password" placeholder="Staff password" value={key} onChange={(e) => setKey(e.target.value)} style={inputStyle} />

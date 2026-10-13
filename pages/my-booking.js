@@ -24,7 +24,7 @@ export default function MyBooking() {
   return (
     <>
       <Head>
-        <title>My Booking · Single Sanedo</title>
+        <title>My Booking · Garba Gone Single</title>
         <link rel="icon" type="image/png" href="/assets/bikers-cafe-logo.png" />
         <meta name="robots" content="noindex,nofollow" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,7 +37,7 @@ export default function MyBooking() {
       <main style={{ maxWidth: 560, margin: '0 auto', padding: '24px 16px 48px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <img src="/assets/bikers-cafe-logo.png" alt="" width={48} height={48} style={{ borderRadius: '50%', boxShadow: '0 0 0 2px #E8A07C' }} />
-          <div><div style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', color: '#CFC4BC' }}>Single Sanedo · Biker's Cafe</div>
+          <div><div style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', color: '#CFC4BC' }}>Garba Gone Single · Biker's Cafe</div>
           <h1 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 30, lineHeight: 1.1 }}>Find your passes</h1></div>
         </header>
         <form onSubmit={find} style={{ display: 'grid', gap: 12 }}>
@@ -49,7 +49,7 @@ export default function MyBooking() {
         {tickets && tickets.map((t) => (
           <div key={t.idx} style={{ display: 'flex', flexWrap: 'wrap', borderRadius: 18, overflow: 'hidden', background: '#FBF7F3', color: '#1E1A1B', boxShadow: '0 18px 40px rgba(0,0,0,.35)' }}>
             <div style={{ flex: '1 1 240px', background: '#B3242A', color: '#FFF3EC', backgroundImage: 'radial-gradient(circle,rgba(255,255,255,.13) 1.4px,transparent 2px)', backgroundSize: '18px 18px', padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <span style={{ fontFamily: "'Rozha One',serif", fontSize: 28, lineHeight: 1.05 }}>Single Sanedo</span>
+              <span style={{ fontFamily: "'Rozha One',serif", fontSize: 28, lineHeight: 1.05 }}>Garba Gone Single</span>
               <div><span style={lab}>Guest</span><div style={{ fontSize: 19, fontWeight: 700 }}>{t.name}</div></div>
               <div style={{ display: 'flex', gap: 24 }}><div><span style={lab}>Age</span><div style={{ fontWeight: 700 }}>{t.age}</div></div><div><span style={lab}>Gender</span><div style={{ fontWeight: 700 }}>{t.gender}</div></div></div>
               <div><span style={lab}>Date</span><div style={{ fontWeight: 700 }}>{t.date}</div></div>
