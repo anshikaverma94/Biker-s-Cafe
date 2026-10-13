@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   guest_count      INTEGER NOT NULL,
   child_count      INTEGER NOT NULL,
   paid_count       INTEGER NOT NULL,
-  total_amount     INTEGER NOT NULL,
+  total_amount     NUMERIC(10,2) NOT NULL,
   status           TEXT NOT NULL DEFAULT 'created', -- created | paid | failed
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -35,3 +35,10 @@ CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 -- Safe to re-run: adds columns to tables created before this column existed.
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS lead_id TEXT;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS gender TEXT;
+ALTER TABLE bookings ALTER COLUMN total_amount TYPE NUMERIC(10,2);
+
+-- Ticketing hardening: IP-based hold limits, check-in, one-time ticket email.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS ip TEXT;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tickets_emailed_at TIMESTAMPTZ;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_bookings_created_at ON bookings(created_at);

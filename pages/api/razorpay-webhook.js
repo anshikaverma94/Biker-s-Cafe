@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { markBookingPaid, markBookingFailed, getBookingWithGuests, getBookingIdByOrderId } from '../../lib/db';
 import { appendBookingToSheet, markLeadConverted } from '../../lib/sheets';
+import { deliverTickets } from '../../lib/deliver';
 import { sendServerEvent } from '../../lib/fbConversions';
 
 // Razorpay webhooks need the raw request body to verify the signature.
@@ -79,6 +80,7 @@ export default async function handler(req, res) {
     if (!full) return res.status(200).json({ received: true }); // no DB row to work from, nothing more we can do
 
     const alreadyProcessed = !justPaid && full.booking.status === 'paid';
+    await deliverTickets(bookingId); // emails once; also rescues the case where the browser never came back
     if (alreadyProcessed) return res.status(200).json({ received: true }); // the client-side call already handled it
 
     appendBookingToSheet({
@@ -88,7 +90,7 @@ export default async function handler(req, res) {
       slotTime: full.booking.slot_time,
       phone: full.booking.phone,
       email: full.booking.email,
-      totalAmount: full.booking.total_amount,
+      totalAmount: Number(full.booking.total_amount),
       status: 'paid (via webhook)',
       guests: full.guests.map((g) => ({ name: g.name, age: g.age, gender: g.gender })),
     }).catch((e) => console.error('sheets append (webhook) failed:', e));
@@ -100,7 +102,7 @@ export default async function handler(req, res) {
       eventId: `purchase_${bookingId}`, // same id the client would have used, so Meta de-dupes if both fire
       email: full.booking.email,
       phone: full.booking.phone,
-      value: full.booking.total_amount,
+      value: Number(full.booking.total_amount),
       eventSourceUrl: process.env.NEXT_PUBLIC_SITE_URL,
     }).catch((e) => console.error('fb purchase event (webhook) failed:', e));
 

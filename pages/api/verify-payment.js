@@ -1,6 +1,9 @@
-import { verifySignature } from '../../lib/razorpay';
+import { verifySignature, getRazorpay } from '../../lib/razorpay';
 import { markBookingPaid, markBookingFailed, getBookingWithGuests } from '../../lib/db';
 import { appendBookingToSheet, markLeadConverted } from '../../lib/sheets';
+import { sanitizeGuests, EVENT_DATE_LONG } from '../../lib/config';
+import { buildTickets } from '../../lib/tickets';
+import { deliverTickets } from '../../lib/deliver';
 import { sendServerEvent } from '../../lib/fbConversions';
 
 export default async function handler(req, res) {
@@ -27,6 +30,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'Signature verification failed' });
   }
 
+  // Don't trust amount/booking details from the browser: take them from the Razorpay
+  // order we created server-side, and make sure it belongs to this booking.
+  let orderAmount;
+  try {
+    const order = await getRazorpay().orders.fetch(razorpay_order_id);
+    if (order.receipt !== bookingId) return res.status(400).json({ ok: false, error: 'Order mismatch' });
+    orderAmount = order.amount / 100;
+  } catch (e) {
+    console.error('order fetch failed:', e);
+    return res.status(502).json({ ok: false, error: 'Could not verify order' });
+  }
+
   // DB is a nice-to-have at this point: the signature already proves the payment is real,
   // so a missing/unavailable Neon database must not block confirming the booking.
   // `justPaid` is null if either the DB is unreachable, or (more importantly) the
@@ -34,7 +49,7 @@ export default async function handler(req, res) {
   // we must not re-append to Sheets / re-fire Purchase, to avoid duplicates.
   let justPaid = null;
   let alreadyProcessed = false;
-  let guestRows = (guests || []).map((g) => ({ name: g.name, age: g.age, gender: g.gender || null }));
+  let guestRows = sanitizeGuests(guests).guests || [];
 
   try {
     justPaid = await markBookingPaid({ bookingId, paymentId: razorpay_payment_id, signature: razorpay_signature });
@@ -47,13 +62,16 @@ export default async function handler(req, res) {
     console.error('DB update on verify-payment failed (continuing without it):', dbErr.message);
   }
 
+  const tickets = await buildTickets(bookingId, guestRows, EVENT_DATE_LONG);
+
   if (alreadyProcessed) {
-    return res.status(200).json({ ok: true, bookingId, ticketCount: guestRows.length });
+    await deliverTickets(bookingId); // no-op if the webhook already emailed them
+    return res.status(200).json({ ok: true, bookingId, ticketCount: guestRows.length, tickets });
   }
 
   const finalEmail = justPaid?.email || email;
   const finalPhone = justPaid?.phone || phone;
-  const finalAmount = justPaid?.total_amount ?? totalAmount;
+  const finalAmount = orderAmount;
 
   // Fire-and-forget side effects: a failure here must not block the paid confirmation.
   appendBookingToSheet({
@@ -83,5 +101,6 @@ export default async function handler(req, res) {
     fbc,
   }).catch((e) => console.error('fb purchase event failed:', e));
 
-  return res.status(200).json({ ok: true, bookingId, ticketCount: guestRows.length });
+  await deliverTickets(bookingId);
+  return res.status(200).json({ ok: true, bookingId, ticketCount: guestRows.length, tickets });
 }

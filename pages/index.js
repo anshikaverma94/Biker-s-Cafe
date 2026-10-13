@@ -1,45 +1,18 @@
 import Head from 'next/head';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PRICE, MAX_QTY, TOTAL_SEATS, GENDERS, EVENT_NAME, EVENT_DATE_SHORT, EVENT_DATE_LONG, VENUE, MIN_AGE, MAX_AGE, computeTotals } from '../lib/config';
 import { genEventId, trackStandardPixel, fbCookies } from '../lib/pixel';
 
-const EVENT_NAME = 'Single Sanedo';
-const EVENT_DATE_SHORT = '17 Oct 2026';
-const EVENT_DATE_LONG = '17th October 2026';
-const VENUE = 'The Bikers Cafe, Gurugram';
-const PRICE = 299;
-const MAX_QTY = 6;
-const SEATS_LEFT = 60;
-const GENDERS = ['Female', 'Male', 'Other'];
 const METHODS = [
   { id: 'upi', label: 'UPI', sub: 'GPay, PhonePe, Paytm' },
   { id: 'card', label: 'Card', sub: 'Visa, Mastercard, RuPay' },
   { id: 'nb', label: 'Netbanking', sub: 'All major banks' },
 ];
 
-const inr = (n) => '₹' + n.toLocaleString('en-IN');
-
-function qr(seed) {
-  let h = 2166136261;
-  for (const ch of seed) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-  const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
-  const cells = [];
-  const finder = (r, c) => { const m = Math.max(Math.abs(r - 3), Math.abs(c - 3)); return m === 3 || m <= 1; };
-  for (let r = 0; r < 21; r++) for (let c = 0; c < 21; c++) {
-    let on;
-    if (r < 7 && c < 7) on = finder(r, c);
-    else if (r < 7 && c > 13) on = finder(r, c - 14);
-    else if (r > 13 && c < 7) on = finder(r - 14, c);
-    else if ((r < 8 && (c < 8 || c > 12)) || (r > 12 && c < 8)) on = false;
-    else on = rnd() > .52;
-    cells.push(on ? '#141213' : '#FFFFFF');
-  }
-  return cells;
-}
+const inr = (n) => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function Home() {
-  const [fullName, setFullName] = useState('');
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
+  const [people, setPeople] = useState([{ name: '', age: '', gender: '' }]);
   const [quantity, setQuantity] = useState(1);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -50,24 +23,41 @@ export default function Home() {
   const [orderInfo, setOrderInfo] = useState(null);
   const [ticketSnapshot, setTicketSnapshot] = useState(null);
   const [notified, setNotified] = useState(false);
+  const [seatsLeft, setSeatsLeft] = useState(TOTAL_SEATS);
+  const [serverError, setServerError] = useState('');
   const leadFiredRef = useRef(false);
   const leadIdRef = useRef(null);
 
-  const ageN = parseInt(age, 10);
-  const subtotal = quantity * PRICE;
-  const gst = Math.round(subtotal * 0.18);
-  const total = subtotal + gst;
+  const { subtotal, gst, total } = computeTotals(quantity);
+
+  const refreshSeats = () => fetch('/api/seats').then((r) => r.json()).then((d) => { if (typeof d.seatsLeft === 'number') setSeatsLeft(d.seatsLeft); }).catch(() => {});
+  useEffect(() => { refreshSeats(); }, []);
+  const soldOut = seatsLeft <= 0;
+  const maxQty = Math.max(1, Math.min(MAX_QTY, seatsLeft));
+  useEffect(() => { if (quantity > maxQty) setQuantity(maxQty); }, [maxQty]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // One details row per pass: keep the array in step with the quantity.
+  useEffect(() => {
+    setPeople((p) => Array.from({ length: quantity }, (_, i) => p[i] || { name: '', age: '', gender: '' }));
+  }, [quantity]);
+
+  const updatePerson = (i, patch) => { setPeople((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x))); setErrors([]); };
+  const personProblem = (g) => {
+    const a = parseInt(g.age, 10);
+    if (g.name.trim().length < 2) return 'name';
+    if (isNaN(a) || a < MIN_AGE || a > MAX_AGE) return 'age';
+    if (!GENDERS.includes(g.gender)) return 'gender';
+    return null;
+  };
 
   const isFormValid = useMemo(() => {
-    if (fullName.trim().length < 2) return false;
-    if (isNaN(ageN) || ageN < 18 || ageN > 100) return false;
-    if (!gender) return false;
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY || quantity > SEATS_LEFT) return false;
+    if (people.length !== quantity || people.some(personProblem)) return false;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY || quantity > seatsLeft) return false;
     if (!/^[6-9]\d{9}$/.test(phone)) return false;
     if (!/^\S+@\S+\.\S+$/.test(email)) return false;
     if (!agree) return false;
     return true;
-  }, [fullName, ageN, gender, quantity, phone, email, agree]);
+  }, [people, quantity, seatsLeft, phone, email, agree]);
 
   // Fire the "details filled" Lead event once, the first time the whole form becomes valid.
   useEffect(() => {
@@ -90,11 +80,16 @@ export default function Home() {
 
   function validate() {
     const e = [];
-    if (fullName.trim().length < 2) e.push('Enter your full name.');
-    if (isNaN(ageN) || ageN < 18 || ageN > 100) e.push('This is a singles-only, 18+ event — enter a valid age.');
-    if (!gender) e.push('Select a gender.');
+    people.forEach((g, i) => {
+      const pr = personProblem(g);
+      const who = quantity > 1 ? `Guest ${i + 1}: ` : '';
+      if (pr === 'name') e.push(who + 'enter the full name.');
+      if (pr === 'age') e.push(who + 'this is a singles-only, 18+ event — enter a valid age.');
+      if (pr === 'gender') e.push(who + 'select a gender.');
+    });
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY) e.push(`Choose between 1 and ${MAX_QTY} passes.`);
-    if (quantity > SEATS_LEFT) e.push('Not enough passes left for this event.');
+    if (soldOut) e.push('Sold out.');
+    else if (quantity > seatsLeft) e.push(`Only ${seatsLeft} passes left.`);
     if (!/^[6-9]\d{9}$/.test(phone)) e.push('Enter a valid 10-digit mobile number.');
     if (!/^\S+@\S+\.\S+$/.test(email)) e.push('Enter a valid email address.');
     if (!agree) e.push('Please accept the eligibility, dress code and house rules.');
@@ -102,7 +97,7 @@ export default function Home() {
   }
 
   function buildGuests() {
-    return Array.from({ length: quantity }, () => ({ name: fullName.trim(), age: ageN, gender }));
+    return people.map((g) => ({ name: g.name.trim(), age: parseInt(g.age, 10), gender: g.gender }));
   }
 
   async function payNow() {
@@ -120,12 +115,21 @@ export default function Home() {
         body: JSON.stringify({
           eventDate: EVENT_DATE_SHORT, slotTime: '', phone, email,
           guests: buildGuests(),
-          totalAmount: total, paidCount: quantity, childCount: 0,
-          leadId: leadIdRef.current,
+                    leadId: leadIdRef.current,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Order creation failed');
+      if (!res.ok) {
+        // Business errors (sold out, too many holds, bad input) go back to the form, not the payment-failed screen.
+        if ([400, 409, 429].includes(res.status)) {
+          setServerError(data.error || 'Could not start payment.');
+          setErrors([data.error || 'Could not start payment.']);
+          setStage('form');
+          refreshSeats();
+          return;
+        }
+        throw new Error(data.error || 'Order creation failed');
+      }
       setBookingId(data.bookingId);
       setOrderInfo(data);
 
@@ -166,21 +170,13 @@ export default function Home() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               fbEventId: purchaseEventId, fbp, fbc, leadId: leadIdRef.current,
-              eventDate: EVENT_DATE_SHORT, slotTime: '',
-              phone, email, totalAmount: total,
-              guests: buildGuests(),
             }),
           });
           const data = await res.json();
           if (!res.ok || !data.ok) throw new Error(data.error || 'Verification failed');
 
           trackStandardPixel('Purchase', purchaseEventId, { value: total, currency: 'INR' });
-          setTicketSnapshot(buildGuests().map((g, i) => ({
-            idx: i + 1, name: g.name, age: g.age, gender: g.gender,
-            date: EVENT_DATE_LONG,
-            no: bookingId + '-' + String(i + 1).padStart(2, '0'),
-            qr: qr(bookingId + i + g.name),
-          })));
+          setTicketSnapshot(data.tickets);
           setStage('success');
           setTimeout(() => setNotified(true), 1600);
         } catch (err) {
@@ -200,9 +196,7 @@ export default function Home() {
 
   function resetAll() {
     setStage('form');
-    setFullName('');
-    setAge('');
-    setGender('');
+    setPeople([{ name: '', age: '', gender: '' }]);
     setQuantity(1);
     setAgree(false);
     setErrors([]);
@@ -210,6 +204,7 @@ export default function Home() {
     setOrderInfo(null);
     setTicketSnapshot(null);
     setNotified(false);
+    refreshSeats();
     leadFiredRef.current = false;
     leadIdRef.current = null;
     window.scrollTo(0, 0);
@@ -229,6 +224,8 @@ export default function Home() {
     <>
       <Head>
         <title>Single Sanedo · Biker's Cafe &amp; Social Nxt</title>
+        <link rel="icon" type="image/png" href="/assets/bikers-cafe-logo.png" />
+        <link rel="apple-touch-icon" href="/assets/bikers-cafe-logo.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Mukta:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
@@ -323,7 +320,7 @@ export default function Home() {
                   <img src="/assets/hero-dance.jpg" alt="Garba circle" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ position: 'absolute', left: -18, bottom: 28, background: '#E8A07C', color: '#141213', padding: '12px 16px', borderRadius: 12, display: 'flex', flexDirection: 'column', boxShadow: '0 10px 24px rgba(0,0,0,.35)' }}>
-                  <span style={{ fontFamily: "'Rozha One',serif", fontSize: 28, lineHeight: 1 }}>{SEATS_LEFT}</span>
+                  <span style={{ fontFamily: "'Rozha One',serif", fontSize: 28, lineHeight: 1 }}>{seatsLeft}</span>
                   <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Passes Left</span>
                 </div>
                 <div style={{ position: 'absolute', right: -28, top: 32, width: '38%', aspectRatio: '4/5', borderRadius: 16, overflow: 'hidden', border: '5px solid #F5EEE8', boxShadow: '0 18px 36px rgba(0,0,0,.45)', transform: 'rotate(5deg)' }}>
@@ -348,28 +345,31 @@ export default function Home() {
             <div style={{ flex: '999 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 36 }}>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ width: 30, height: 30, borderRadius: '50%', background: '#141213', color: '#E8A07C', display: 'grid', placeItems: 'center', fontWeight: 700 }}>1</span><span style={{ fontSize: 20, fontWeight: 700 }}>Your details</span></div>
-                <div style={{ background: '#FBF7F3', border: '1px solid #E3D7CD', borderRadius: 14, padding: 14, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '3 1 240px', minWidth: 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Full Name</span>
-                    <input value={fullName} onChange={(e) => { setFullName(e.target.value); setErrors([]); }} placeholder="As on photo ID" style={{ height: 48, border: '1.5px solid #D6C5B8', borderRadius: 10, padding: '0 14px', fontSize: 17, background: '#fff', color: '#1E1A1B', width: '100%' }} />
-                  </label>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 120px', minWidth: 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Age</span>
-                    <input value={age} onChange={(e) => { setAge(e.target.value.replace(/\D/g, '').slice(0, 3)); setErrors([]); }} inputMode="numeric" placeholder="18+" style={{ height: 48, border: '1.5px solid #D6C5B8', borderRadius: 10, padding: '0 12px', fontSize: 17, background: '#fff', color: '#1E1A1B', width: '100%' }} />
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '2 1 220px', minWidth: 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Gender</span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {GENDERS.map((g) => {
-                        const on = gender === g;
-                        return (
-                          <button key={g} onClick={() => { setGender(g); setErrors([]); }} style={{ flex: 1, height: 48, borderRadius: 10, border: `1.5px solid ${on ? '#B3242A' : '#D6C5B8'}`, background: on ? '#B3242A' : '#fff', color: on ? '#fff' : '#1E1A1B', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>{g}</button>
-                        );
-                      })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ width: 30, height: 30, borderRadius: '50%', background: '#141213', color: '#E8A07C', display: 'grid', placeItems: 'center', fontWeight: 700 }}>1</span><span style={{ fontSize: 20, fontWeight: 700 }}>{quantity > 1 ? 'Details of every guest' : 'Your details'}</span></div>
+                {people.map((g, i) => (
+                  <div key={i} style={{ background: '#FBF7F3', border: '1px solid #E3D7CD', borderRadius: 14, padding: 14, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {quantity > 1 && <div style={{ flex: '1 1 100%', fontSize: 14, fontWeight: 700, color: '#B3242A' }}>Guest {i + 1}{i === 0 ? ' (you)' : ''}</div>}
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '3 1 240px', minWidth: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Full Name</span>
+                      <input value={g.name} maxLength={100} onChange={(e) => updatePerson(i, { name: e.target.value })} placeholder="As on photo ID" style={{ height: 48, border: '1.5px solid #D6C5B8', borderRadius: 10, padding: '0 14px', fontSize: 17, background: '#fff', color: '#1E1A1B', width: '100%' }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 120px', minWidth: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Age</span>
+                      <input value={g.age} onChange={(e) => updatePerson(i, { age: e.target.value.replace(/\D/g, '').slice(0, 3) })} inputMode="numeric" placeholder="18+" style={{ height: 48, border: '1.5px solid #D6C5B8', borderRadius: 10, padding: '0 12px', fontSize: 17, background: '#fff', color: '#1E1A1B', width: '100%' }} />
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '2 1 220px', minWidth: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Gender</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {GENDERS.map((opt) => {
+                          const on = g.gender === opt;
+                          return (
+                            <button key={opt} onClick={() => updatePerson(i, { gender: opt })} style={{ flex: 1, height: 48, borderRadius: 10, border: `1.5px solid ${on ? '#B3242A' : '#D6C5B8'}`, background: on ? '#B3242A' : '#fff', color: on ? '#fff' : '#1E1A1B', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>{opt}</button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -379,7 +379,7 @@ export default function Home() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <button onClick={() => { setQuantity((q) => Math.max(1, q - 1)); setErrors([]); }} aria-label="Decrease" style={{ width: 44, height: 44, borderRadius: 10, border: '1.5px solid #D6C5B8', background: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', color: '#1E1A1B' }}>−</button>
                     <span style={{ fontFamily: "'Rozha One',serif", fontSize: 28, minWidth: 32, textAlign: 'center' }}>{quantity}</span>
-                    <button onClick={() => { setQuantity((q) => Math.min(MAX_QTY, SEATS_LEFT, q + 1)); setErrors([]); }} aria-label="Increase" style={{ width: 44, height: 44, borderRadius: 10, border: '1.5px solid #D6C5B8', background: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', color: '#1E1A1B' }}>+</button>
+                    <button onClick={() => { setQuantity((q) => Math.min(maxQty, q + 1)); setErrors([]); }} aria-label="Increase" style={{ width: 44, height: 44, borderRadius: 10, border: '1.5px solid #D6C5B8', background: '#fff', fontSize: 20, fontWeight: 700, cursor: 'pointer', color: '#1E1A1B' }}>+</button>
                   </div>
                 </div>
               </div>
@@ -426,10 +426,10 @@ export default function Home() {
                   </div>
                 )}
                 <div style={{ position: 'relative' }}>
-                  <button onClick={payNow} className="shake-btn" style={{ width: '100%', height: 56, border: 0, borderRadius: 14, background: '#D0262C', color: '#fff', font: "700 19px 'Mukta',sans-serif", cursor: 'pointer', boxShadow: '0 5px 0 #7A1519' }}>Pay Now · {inr(total)}</button>
-                  <span className="alert-badge">{quantity}</span>
+                  <button onClick={payNow} className="shake-btn" style={{ width: '100%', height: 56, border: 0, borderRadius: 14, background: '#D0262C', color: '#fff', font: "700 19px 'Mukta',sans-serif", cursor: soldOut ? 'not-allowed' : 'pointer', boxShadow: '0 5px 0 #7A1519', opacity: soldOut ? .5 : 1 }} disabled={soldOut}>{soldOut ? 'Sold Out' : `Pay Now · ${inr(total)}`}</button>
+                  {!soldOut && <span className="alert-badge">{quantity}</span>}
                 </div>
-                <span style={{ fontSize: 14, color: '#B4A79F', textAlign: 'center', lineHeight: 1.4 }}>Secured by Razorpay · UPI, Cards &amp; Netbanking. Passes sent via email and SMS.</span>
+                <span style={{ fontSize: 14, color: '#B4A79F', textAlign: 'center', lineHeight: 1.4 }}>Secured by Razorpay · UPI, Cards &amp; Netbanking. Passes sent by email.</span>
               </div>
             </aside>
           </div>
@@ -546,8 +546,8 @@ export default function Home() {
               <h2 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 'clamp(36px,6vw,64px)', lineHeight: 1 }}>See you on the dance floor!</h2>
               <p style={{ margin: 0, fontSize: 18, color: '#DDD3CB' }}>Booking <strong style={{ color: '#E8A07C' }}>{bookingId}</strong> · {ticketSnapshot.length} {ticketSnapshot.length === 1 ? 'pass' : 'passes'} for {EVENT_DATE_LONG}</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 15 }}>
-                <span style={{ padding: '8px 14px', borderRadius: 999, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)' }}>{(notified ? '✓ Emailed to ' : 'Emailing ') + email}</span>
-                <span style={{ padding: '8px 14px', borderRadius: 999, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)' }}>{(notified ? '✓ SMS sent to +91 ' : 'Sending SMS to +91 ') + phone}</span>
+                <span style={{ padding: '8px 14px', borderRadius: 999, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)' }}>{'✉ Passes emailed to ' + email}</span>
+                <span style={{ padding: '8px 14px', borderRadius: 999, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)' }}>Save this page or find it later at /my-booking with {bookingId} + your mobile</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
                 <button onClick={() => window.print()} style={{ height: 52, padding: '0 26px', border: 0, borderRadius: 999, background: '#E8A07C', color: '#141213', font: "700 17px 'Mukta',sans-serif", cursor: 'pointer' }}>Download passes (PDF)</button>
@@ -571,9 +571,7 @@ export default function Home() {
                     <span style={{ fontSize: 14, opacity: .9 }}>Singles only · Traditional attire mandatory · Carry photo ID</span>
                   </div>
                   <div style={{ flex: '0 1 220px', minWidth: 200, margin: '0 auto', padding: 22, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, borderLeft: '2px dashed #D6C5B8' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(21,1fr)', width: 150, height: 150, background: '#fff', padding: 6, boxSizing: 'content-box' }}>
-                      {t.qr.map((c, i) => <div key={i} style={{ background: c }}></div>)}
-                    </div>
+                    <img src={t.qr} alt={`QR for ${t.no}`} width={150} height={150} style={{ background: '#fff', padding: 6, boxSizing: 'content-box', display: 'block' }} />
                     <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 14, fontWeight: 600, letterSpacing: '.04em' }}>{t.no}</span>
                     <span style={{ fontSize: 13, color: '#6A5E5A' }}>Pass {t.idx} of {ticketSnapshot.length}</span>
                   </div>

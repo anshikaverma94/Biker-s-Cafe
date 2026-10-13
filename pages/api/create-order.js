@@ -1,5 +1,7 @@
 import { getRazorpay } from '../../lib/razorpay';
-import { createPendingBooking } from '../../lib/db';
+import { reserveBooking, setBookingOrderId, markBookingFailed, SeatsError } from '../../lib/db';
+import { computeTotals, sanitizeGuests, EVENT_DATE_SHORT } from '../../lib/config';
+import { rateLimit, clientIp } from '../../lib/rateLimit';
 
 function rid(n) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -8,46 +10,48 @@ function rid(n) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!rateLimit(req, res, { key: 'order', max: 8, windowMs: 10 * 60 * 1000 })) return;
 
   try {
-    const { eventDate, slotTime, phone, email, guests, totalAmount, paidCount, childCount, leadId } = req.body;
+    const { phone, email, leadId } = req.body;
+    const eventDate = EVENT_DATE_SHORT;
+    const slotTime = '';
 
-    if (!eventDate || !phone || !email || !Array.isArray(guests) || guests.length === 0) {
-      return res.status(400).json({ error: 'Missing or invalid booking details' });
+    if (!/^[6-9]\d{9}$/.test(String(phone || '')) || !/^\S+@\S+\.\S+$/.test(String(email || '')) || String(email).length > 200) {
+      return res.status(400).json({ error: 'Invalid phone or email' });
     }
-    if (!Number.isInteger(totalAmount) || totalAmount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
+    const cleaned = sanitizeGuests(req.body.guests);
+    if (cleaned.error) return res.status(400).json({ error: cleaned.error });
+    const guests = cleaned.guests;
+    // Price is always computed here; any amount sent by the client is ignored.
+    const { total: totalAmount, totalPaise } = computeTotals(guests.length);
 
     const bookingId = 'RT26-' + rid(5);
-    const razorpay = getRazorpay();
 
-    const order = await razorpay.orders.create({
-      amount: totalAmount * 100, // paise
-      currency: 'INR',
-      receipt: bookingId,
-      notes: { bookingId, eventDate, slotTime, phone, email },
-    });
-
-    // Persisting to Neon must not block checkout: if the DB isn't configured yet
-    // (or is briefly unavailable), the Razorpay order still goes through.
+    // The booking MUST be saved (and seats reserved) before we take any money.
     try {
-      await createPendingBooking({
-        bookingId,
-        orderId: order.id,
-        leadId,
-        eventDate,
-        slotTime,
-        phone,
-        email,
-        guestCount: guests.length,
-        childCount: childCount || 0,
-        paidCount: paidCount ?? guests.length,
-        totalAmount,
-        guests: guests.map((g) => ({ name: g.name, age: g.age, gender: g.gender || null })),
+      await reserveBooking({
+        bookingId, leadId, eventDate, slotTime, phone, email,
+        guestCount: guests.length, totalAmount, guests, ip: clientIp(req),
       });
     } catch (dbErr) {
-      console.error('createPendingBooking failed (continuing with payment):', dbErr.message);
+      if (dbErr instanceof SeatsError) return res.status(409).json({ error: dbErr.message });
+      console.error('reserveBooking failed:', dbErr);
+      return res.status(503).json({ error: 'Booking is temporarily unavailable. Please try again shortly.' });
+    }
+
+    let order;
+    try {
+      order = await getRazorpay().orders.create({
+        amount: totalPaise,
+        currency: 'INR',
+        receipt: bookingId,
+        notes: { bookingId, eventDate, slotTime, phone, email },
+      });
+      await setBookingOrderId(bookingId, order.id);
+    } catch (err) {
+      await markBookingFailed(bookingId).catch(() => {}); // release the held seats
+      throw err;
     }
 
     return res.status(200).json({

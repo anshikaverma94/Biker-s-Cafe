@@ -1,10 +1,12 @@
 import { appendLeadToSheet } from '../../lib/sheets';
+import { rateLimit } from '../../lib/rateLimit';
 import { sendServerEvent } from '../../lib/fbConversions';
 
 // Called once when the form becomes fully valid (details filled), before payment.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  if (!rateLimit(req, res, { key: 'lead', max: 10, windowMs: 10 * 60 * 1000 })) return;
   const { leadId, eventDate, slotTime, phone, email, guestCount, fbEventId, fbp, fbc } = req.body;
   if (!phone || !email) return res.status(400).json({ error: 'Missing contact details' });
 
