@@ -54,7 +54,9 @@ export default function Home() {
   const leadIdRef = useRef(null);
 
   const ageN = parseInt(age, 10);
-  const total = quantity * PRICE;
+  const subtotal = quantity * PRICE;
+  const gst = Math.round(subtotal * 0.18);
+  const total = subtotal + gst;
 
   const isFormValid = useMemo(() => {
     if (fullName.trim().length < 2) return false;
@@ -336,54 +338,6 @@ export default function Home() {
           {['#F07A1A', '#FFFFFF', '#D7262E', '#1F3FA8', '#F6C21B', '#2E8B3E', '#8A8A8A', '#6B2C91', '#0E8C88'].map((c, i) => <div key={i} style={{ background: c }}></div>)}
         </div>
 
-        <section id="night" style={{ maxWidth: 1200, margin: '0 auto', padding: 'clamp(56px,8vw,104px) clamp(16px,4vw,32px)' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'end', gap: 20, marginBottom: 40 }}>
-            <div style={{ maxWidth: 620 }}>
-              <h2 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 'clamp(34px,5vw,56px)', lineHeight: 1 }}>Swipe Less. Spin More.</h2>
-              <p style={{ margin: '12px 0 0', fontSize: 17, lineHeight: 1.55, color: '#6A5E5A' }}>Garba ke steps milenge ya dil ke connections?</p>
-            </div>
-            <p style={{ margin: 0, maxWidth: 380, fontSize: 17, lineHeight: 1.55, color: '#6A5E5A' }}>One night, a room full of singles, and endless possibilities!</p>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,260px),1fr))', gap: 20 }}>
-            {[
-              ['01', 'Dandiya Pe Dil Aa Gaya', "Two sticks. One dance floor. Endless chances to find your perfect dance partner. You just bring your moves, we'll bring the vibe!", '/assets/dandiya-sticks.jpg'],
-              ['02', 'Awkwardness? Game Over!', 'Forget boring introductions. Fun icebreakers, quirky challenges, and interactive games will get everyone talking, laughing, and connecting.', '/assets/live-dj.jpg'],
-              ['03', 'Sip, Sip, Sanedo!', 'Your ₹299 pass includes one mocktail or cocktail. Sip, mingle, and let the conversations flow while the Dandiya goes on!', '/assets/festive-drinks.jpg'],
-            ].map(([num, title, desc, img]) => (
-              <div key={num} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="night-photo" style={{ aspectRatio: '4/3', borderRadius: 14, overflow: 'hidden', background: '#E6DAD0' }}>
-                  <img src={img} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .5s ease' }} />
-                </div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}><span style={{ fontFamily: "'Rozha One',serif", color: '#B3242A', fontSize: 22 }}>{num}</span><div><div style={{ fontSize: 20, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 16, color: '#6A5E5A', lineHeight: 1.5 }}>{desc}</div></div></div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section id="rules" style={{ background: '#B3242A', color: '#FFF3EC', backgroundImage: 'radial-gradient(circle,rgba(255,255,255,.12) 1.4px,transparent 2px)', backgroundSize: '20px 20px' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: 'clamp(56px,8vw,96px) clamp(16px,4vw,32px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(32px,5vw,64px)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <span style={{ fontSize: 14, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: '#F6CDB4' }}>Before You Arrive</span>
-              <h2 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 'clamp(34px,5vw,56px)', lineHeight: 1 }}>Rules of the Circles!</h2>
-              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, maxWidth: 400 }}>A little discipline, a lot of Dandiya! Follow these house rules so everyone can enjoy the night.</p>
-            </div>
-            <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column' }}>
-              {[
-                ['i.', 'Single Ho Toh Swagat Hai!', "Exclusively for singles. Come solo or bring your single gang. Couples, this one's not your night!"],
-                ['ii.', 'Desi Fits Only!', 'Traditional attire is mandatory. Kurtas, lehengas, sarees, chaniya cholis, just bring your festive A-game!'],
-                ['iii.', 'One Pass. One Person.', 'Each pass is valid for one attendee and the booked event slot only. Be on time and keep your booking confirmation ready.'],
-                ['iv.', 'ID Dikhao, Entry Pao!', 'Carry a valid government-issued photo ID. Your name must match your booking details.'],
-                ['v.', 'Good Vibes, Good Behaviour!', 'Respect personal boundaries and venue rules. Passes are non-refundable and non-transferable.'],
-              ].map(([num, title, desc], i, arr) => (
-                <li key={num} style={{ display: 'grid', gridTemplateColumns: '44px 1fr', gap: 8, padding: '16px 0', borderTop: '1px solid rgba(255,255,255,.3)', borderBottom: i === arr.length - 1 ? '1px solid rgba(255,255,255,.3)' : undefined }}>
-                  <span style={{ fontFamily: "'Rozha One',serif", fontSize: 22, color: '#F6CDB4' }}>{num}</span>
-                  <div><div style={{ fontSize: 19, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 16, lineHeight: 1.5, opacity: .92 }}>{desc}</div></div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
         <section id="book" style={{ maxWidth: 1200, margin: '0 auto', padding: 'clamp(56px,8vw,104px) clamp(16px,4vw,32px)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 36 }}>
             <span style={{ fontSize: 14, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: '#B3242A' }}>Book Passes</span>
@@ -458,7 +412,8 @@ export default function Home() {
                   <span style={{ fontSize: 16, color: '#CFC4BC' }}>{EVENT_DATE_LONG}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 17 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Passes × {quantity} <span style={{ color: '#B4A79F' }}>@ ₹{PRICE}</span></span><span>{inr(total)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Passes × {quantity} <span style={{ color: '#B4A79F' }}>@ ₹{PRICE}</span></span><span>{inr(subtotal)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#B4A79F', fontSize: 15 }}><span>GST (18%)</span><span>{inr(gst)}</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#B4A79F', fontSize: 15 }}><span>Convenience Fee</span><span>₹0</span></div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 16, borderTop: '1px solid rgba(232,160,124,.4)' }}>
@@ -477,6 +432,54 @@ export default function Home() {
                 <span style={{ fontSize: 14, color: '#B4A79F', textAlign: 'center', lineHeight: 1.4 }}>Secured by Razorpay · UPI, Cards &amp; Netbanking. Passes sent via email and SMS.</span>
               </div>
             </aside>
+          </div>
+        </section>
+
+        <section id="night" style={{ maxWidth: 1200, margin: '0 auto', padding: 'clamp(56px,8vw,104px) clamp(16px,4vw,32px)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'end', gap: 20, marginBottom: 40 }}>
+            <div style={{ maxWidth: 620 }}>
+              <h2 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 'clamp(34px,5vw,56px)', lineHeight: 1 }}>Swipe Less. Spin More.</h2>
+              <p style={{ margin: '12px 0 0', fontSize: 17, lineHeight: 1.55, color: '#6A5E5A' }}>Garba ke steps milenge ya dil ke connections?</p>
+            </div>
+            <p style={{ margin: 0, maxWidth: 380, fontSize: 17, lineHeight: 1.55, color: '#6A5E5A' }}>One night, a room full of singles, and endless possibilities!</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,260px),1fr))', gap: 20 }}>
+            {[
+              ['01', 'Dandiya Pe Dil Aa Gaya', "Two sticks. One dance floor. Endless chances to find your perfect dance partner. You just bring your moves, we'll bring the vibe!", '/assets/dandiya-sticks.jpg'],
+              ['02', 'Awkwardness? Game Over!', 'Forget boring introductions. Fun icebreakers, quirky challenges, and interactive games will get everyone talking, laughing, and connecting.', '/assets/live-dj.jpg'],
+              ['03', 'Sip, Sip, Sanedo!', 'Your ₹299 pass includes one mocktail or cocktail. Sip, mingle, and let the conversations flow while the Dandiya goes on!', '/assets/festive-drinks.jpg'],
+            ].map(([num, title, desc, img]) => (
+              <div key={num} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="night-photo" style={{ aspectRatio: '4/3', borderRadius: 14, overflow: 'hidden', background: '#E6DAD0' }}>
+                  <img src={img} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .5s ease' }} />
+                </div>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}><span style={{ fontFamily: "'Rozha One',serif", color: '#B3242A', fontSize: 22 }}>{num}</span><div><div style={{ fontSize: 20, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 16, color: '#6A5E5A', lineHeight: 1.5 }}>{desc}</div></div></div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="rules" style={{ background: '#B3242A', color: '#FFF3EC', backgroundImage: 'radial-gradient(circle,rgba(255,255,255,.12) 1.4px,transparent 2px)', backgroundSize: '20px 20px' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: 'clamp(56px,8vw,96px) clamp(16px,4vw,32px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,340px),1fr))', gap: 'clamp(32px,5vw,64px)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <span style={{ fontSize: 14, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: '#F6CDB4' }}>Before You Arrive</span>
+              <h2 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 'clamp(34px,5vw,56px)', lineHeight: 1 }}>Rules of the Circles!</h2>
+              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, maxWidth: 400 }}>A little discipline, a lot of Dandiya! Follow these house rules so everyone can enjoy the night.</p>
+            </div>
+            <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column' }}>
+              {[
+                ['i.', 'Single Ho Toh Swagat Hai!', "Exclusively for singles. Come solo or bring your single gang. Couples, this one's not your night!"],
+                ['ii.', 'Desi Fits Only!', 'Traditional attire is mandatory. Kurtas, lehengas, sarees, chaniya cholis, just bring your festive A-game!'],
+                ['iii.', 'One Pass. One Person.', 'Each pass is valid for one attendee and the booked event slot only. Be on time and keep your booking confirmation ready.'],
+                ['iv.', 'ID Dikhao, Entry Pao!', 'Carry a valid government-issued photo ID. Your name must match your booking details.'],
+                ['v.', 'Good Vibes, Good Behaviour!', 'Respect personal boundaries and venue rules. Passes are non-refundable and non-transferable.'],
+              ].map(([num, title, desc], i, arr) => (
+                <li key={num} style={{ display: 'grid', gridTemplateColumns: '44px 1fr', gap: 8, padding: '16px 0', borderTop: '1px solid rgba(255,255,255,.3)', borderBottom: i === arr.length - 1 ? '1px solid rgba(255,255,255,.3)' : undefined }}>
+                  <span style={{ fontFamily: "'Rozha One',serif", fontSize: 22, color: '#F6CDB4' }}>{num}</span>
+                  <div><div style={{ fontSize: 19, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 16, lineHeight: 1.5, opacity: .92 }}>{desc}</div></div>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
