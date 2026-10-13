@@ -453,7 +453,7 @@ export default function Home() {
                 <div className="night-photo" style={{ aspectRatio: '4/3', borderRadius: 14, overflow: 'hidden', background: '#E6DAD0' }}>
                   <img src={img} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .5s ease' }} />
                 </div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}><span style={{ fontFamily: "'Rozha One',serif", color: '#B3242A', fontSize: 22 }}>{num}</span><div><div style={{ fontSize: 20, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 16, color: '#6A5E5A', lineHeight: 1.5 }}>{desc}</div></div></div>
+                <div style={{ display: 'flex', gap: 18, alignItems: 'baseline' }}><span style={{ fontFamily: "'Rozha One',serif", color: '#B3242A', fontSize: 22, flex: 'none', minWidth: 34 }}>{num}</span><div><div style={{ fontSize: 20, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 16, color: '#6A5E5A', lineHeight: 1.5 }}>{desc}</div></div></div>
               </div>
             ))}
           </div>
@@ -474,7 +474,7 @@ export default function Home() {
                 ['iv.', 'ID Dikhao, Entry Pao!', 'Carry a valid government-issued photo ID. Your name must match your booking details.'],
                 ['v.', 'Good Vibes, Good Behaviour!', 'Respect personal boundaries and venue rules. Passes are non-refundable and non-transferable.'],
               ].map(([num, title, desc], i, arr) => (
-                <li key={num} style={{ display: 'grid', gridTemplateColumns: '44px 1fr', gap: 8, padding: '16px 0', borderTop: '1px solid rgba(255,255,255,.3)', borderBottom: i === arr.length - 1 ? '1px solid rgba(255,255,255,.3)' : undefined }}>
+                <li key={num} style={{ display: 'grid', gridTemplateColumns: '52px 1fr', gap: 12, padding: '16px 0', borderTop: '1px solid rgba(255,255,255,.3)', borderBottom: i === arr.length - 1 ? '1px solid rgba(255,255,255,.3)' : undefined }}>
                   <span style={{ fontFamily: "'Rozha One',serif", fontSize: 22, color: '#F6CDB4' }}>{num}</span>
                   <div><div style={{ fontSize: 19, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 16, lineHeight: 1.5, opacity: .92 }}>{desc}</div></div>
                 </li>
