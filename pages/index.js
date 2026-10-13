@@ -26,6 +26,7 @@ export default function Home() {
   const [seatsLeft, setSeatsLeft] = useState(TOTAL_SEATS);
   const [serverError, setServerError] = useState('');
   const leadFiredRef = useRef(false);
+  const rzpOpenRef = useRef(false);
   const leadIdRef = useRef(null);
 
   const { subtotal, gst, total } = computeTotals(quantity);
@@ -107,6 +108,7 @@ export default function Home() {
     const eventId = genEventId('checkout');
     trackStandardPixel('InitiateCheckout', eventId, { value: total, currency: 'INR' });
 
+    rzpOpenRef.current = false;
     setStage('checkout');
     try {
       const res = await fetch('/api/create-order', {
@@ -147,6 +149,8 @@ export default function Home() {
 
   function openRazorpay() {
     if (!orderInfo || typeof window === 'undefined' || !window.Razorpay) return;
+    if (rzpOpenRef.current) return; // never open two checkout windows
+    rzpOpenRef.current = true;
     const rzp = new window.Razorpay({
       key: orderInfo.keyId,
       amount: orderInfo.amount,
@@ -184,9 +188,9 @@ export default function Home() {
           setStage('failed');
         }
       },
-      modal: { ondismiss: () => setStage('failed') },
+      modal: { ondismiss: () => { rzpOpenRef.current = false; setStage('failed'); } },
     });
-    rzp.on('payment.failed', () => setStage('failed'));
+    rzp.on('payment.failed', () => { rzpOpenRef.current = false; setStage('failed'); });
     rzp.open();
   }
 
@@ -202,6 +206,7 @@ export default function Home() {
     setErrors([]);
     setBookingId('');
     setOrderInfo(null);
+    rzpOpenRef.current = false;
     setTicketSnapshot(null);
     setNotified(false);
     refreshSeats();

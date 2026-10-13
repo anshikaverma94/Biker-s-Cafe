@@ -59,7 +59,8 @@ export default async function handler(req, res) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      // Same key that created the order (read at runtime), so checkout can never open with a different key.
+      keyId: process.env.RAZORPAY_KEY_ID,
     });
   } catch (err) {
     console.error('create-order error:', err);
