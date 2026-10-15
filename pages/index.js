@@ -73,6 +73,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId, eventDate: EVENT_DATE_SHORT, slotTime: '', phone, email, guestCount: quantity,
+          guests: people.map((g) => ({ name: g.name.trim(), age: parseInt(g.age, 10), gender: g.gender })),
           fbEventId: leadId, fbp, fbc,
         }),
       }).catch(() => {});

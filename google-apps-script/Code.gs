@@ -3,7 +3,7 @@
 
 var SECRET = 'replace-with-a-long-random-string'; // must match SHEETS_WEBHOOK_SECRET in .env.local
 
-var LEADS_HEADERS = ['Timestamp', 'Lead ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Count', 'Status'];
+var LEADS_HEADERS = ['Timestamp', 'Lead ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Count', 'Status', 'Guest Name', 'Guest Age', 'Gender'];
 var BOOKINGS_HEADERS = ['Timestamp', 'Booking ID', 'Order ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Name', 'Guest Age', 'Gender', 'Amount (Rs)', 'Status', 'Payment ID'];
 
 function doPost(e) {
@@ -47,6 +47,7 @@ function addLead(body) {
   sh.appendRow([
     new Date().toISOString(), body.leadId || '', body.eventDate || '', body.slotTime || '',
     body.phone || '', body.email || '', body.guestCount || '', 'Filled - not paid',
+    body.guestNames || '', body.guestAges || '', body.guestGenders || '',
   ]);
   return jsonOutput({ ok: true });
 }
