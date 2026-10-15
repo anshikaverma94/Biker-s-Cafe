@@ -1,108 +1,54 @@
 import { verifySignature, getRazorpay } from '../../lib/razorpay';
-import { markBookingPaid, markBookingFailed, getBookingWithGuests } from '../../lib/db';
-import { appendBookingToSheet, markLeadConverted } from '../../lib/sheets';
-import { sanitizeGuests, EVENT_DATE_LONG } from '../../lib/config';
+import { EVENT_DATE_LONG } from '../../lib/config';
 import { buildTickets } from '../../lib/tickets';
-import { deliverTickets } from '../../lib/deliver';
-import { sendServerEvent } from '../../lib/fbConversions';
+import { finalizePaidBooking } from '../../lib/finalize';
+import { logEvent, errInfo } from '../../lib/log';
 
+// Called by the browser right after Razorpay's checkout succeeds. The Razorpay webhook and the
+// reconcile job do the same work if this call never arrives, so everything here is idempotent.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const {
-    bookingId, razorpay_order_id, razorpay_payment_id, razorpay_signature, fbEventId, fbp, fbc, leadId,
-    // Sent by the client as a fallback so Sheets/Pixel still work even if the DB row is missing.
-    eventDate, slotTime, phone, email, totalAmount, guests,
-  } = req.body;
+  const { bookingId, razorpay_order_id, razorpay_payment_id, razorpay_signature, fbp, fbc } = req.body;
+  const ids = { source: 'verify', bookingId, orderId: razorpay_order_id, paymentId: razorpay_payment_id };
 
   if (!bookingId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    await logEvent({ ...ids, event: 'rejected.missing_fields', level: 'error' });
     return res.status(400).json({ error: 'Missing payment fields' });
   }
+  await logEvent({ ...ids, event: 'received' });
 
-  const valid = verifySignature({
-    orderId: razorpay_order_id,
-    paymentId: razorpay_payment_id,
-    signature: razorpay_signature,
-  });
-
+  const valid = verifySignature({ orderId: razorpay_order_id, paymentId: razorpay_payment_id, signature: razorpay_signature });
   if (!valid) {
-    await markBookingFailed(bookingId).catch(() => {});
+    // Don't flip the booking to failed on an unverifiable call; a real payment is still picked up by the webhook/reconcile.
+    await logEvent({ ...ids, event: 'rejected.bad_signature', level: 'error' });
     return res.status(400).json({ ok: false, error: 'Signature verification failed' });
   }
 
-  // Don't trust amount/booking details from the browser: take them from the Razorpay
-  // order we created server-side, and make sure it belongs to this booking.
-  let orderAmount;
+  // Extra check that the order belongs to this booking. A Razorpay API hiccup must NOT block a
+  // customer whose signature is already valid, so only a definite mismatch is fatal.
   try {
     const order = await getRazorpay().orders.fetch(razorpay_order_id);
-    if (order.receipt !== bookingId) return res.status(400).json({ ok: false, error: 'Order mismatch' });
-    orderAmount = order.amount / 100;
+    if (order.receipt !== bookingId) {
+      await logEvent({ ...ids, event: 'rejected.order_mismatch', level: 'error', detail: { receipt: order.receipt } });
+      return res.status(400).json({ ok: false, error: 'Order mismatch' });
+    }
   } catch (e) {
-    console.error('order fetch failed:', e);
-    return res.status(502).json({ ok: false, error: 'Could not verify order' });
+    await logEvent({ ...ids, event: 'order_fetch.failed_continuing', level: 'error', detail: errInfo(e) });
   }
-
-  // DB is a nice-to-have at this point: the signature already proves the payment is real,
-  // so a missing/unavailable Neon database must not block confirming the booking.
-  // `justPaid` is null if either the DB is unreachable, or (more importantly) the
-  // Razorpay webhook already marked this booking paid moments ago — in that case
-  // we must not re-append to Sheets / re-fire Purchase, to avoid duplicates.
-  let justPaid = null;
-  let alreadyProcessed = false;
-  let guestRows = sanitizeGuests(guests).guests || [];
 
   try {
-    justPaid = await markBookingPaid({ bookingId, paymentId: razorpay_payment_id, signature: razorpay_signature });
-    const full = await getBookingWithGuests(bookingId);
-    if (full) {
-      guestRows = full.guests;
-      alreadyProcessed = !justPaid && full.booking.status === 'paid';
-    }
-  } catch (dbErr) {
-    console.error('DB update on verify-payment failed (continuing without it):', dbErr.message);
+    const r = await finalizePaidBooking({
+      bookingId, orderId: razorpay_order_id, paymentId: razorpay_payment_id, source: 'verify',
+      fb: { fbp, fbc, clientIp: req.headers['x-forwarded-for'] || req.socket.remoteAddress, userAgent: req.headers['user-agent'] },
+    });
+    if (!r.ok) return res.status(500).json({ ok: false, error: 'Booking not found' });
+    const tickets = await buildTickets(bookingId, r.guests, EVENT_DATE_LONG);
+    await logEvent({ ...ids, event: 'responded.ok', detail: { tickets: tickets.length, already: !!r.already } });
+    return res.status(200).json({ ok: true, bookingId, ticketCount: tickets.length, tickets });
+  } catch (err) {
+    // The payment IS valid. Tell the client to keep checking; the webhook/reconcile will finish the job.
+    await logEvent({ ...ids, event: 'finalize_error', level: 'error', detail: errInfo(err) });
+    return res.status(500).json({ ok: false, pending: true, error: 'Payment received, confirmation in progress' });
   }
-
-  const tickets = await buildTickets(bookingId, guestRows, EVENT_DATE_LONG);
-
-  if (alreadyProcessed) {
-    await deliverTickets(bookingId); // no-op if the webhook already emailed them
-    return res.status(200).json({ ok: true, bookingId, ticketCount: guestRows.length, tickets });
-  }
-
-  const finalEmail = justPaid?.email || email;
-  const finalPhone = justPaid?.phone || phone;
-  const finalAmount = orderAmount;
-
-  // Fire-and-forget side effects: a failure here must not block the paid confirmation.
-  const sideEffects = [];
-  sideEffects.push(appendBookingToSheet({
-    bookingId,
-    orderId: razorpay_order_id,
-    eventDate: justPaid?.event_date || eventDate,
-    slotTime: justPaid?.slot_time || slotTime,
-    phone: finalPhone,
-    email: finalEmail,
-    totalAmount: finalAmount,
-    status: 'paid',
-    guests: guestRows.map((g) => ({ name: g.name, age: g.age, gender: g.gender })),
-  }).catch((e) => console.error('sheets append failed:', e)));
-
-  sideEffects.push(markLeadConverted({ leadId: leadId || justPaid?.lead_id, bookingId }).catch((e) => console.error('mark lead converted failed:', e)));
-
-  sideEffects.push(sendServerEvent({
-    eventName: 'Purchase',
-    eventId: fbEventId || `purchase_${bookingId}`,
-    email: finalEmail,
-    phone: finalPhone,
-    value: finalAmount,
-    eventSourceUrl: process.env.NEXT_PUBLIC_SITE_URL,
-    clientIp: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-    userAgent: req.headers['user-agent'],
-    fbp,
-    fbc,
-  }).catch((e) => console.error('fb purchase event failed:', e)));
-  await Promise.allSettled(sideEffects); // finish before responding so serverless doesn't cut them off
-
-  await deliverTickets(bookingId);
-  return res.status(200).json({ ok: true, bookingId, ticketCount: guestRows.length, tickets });
 }

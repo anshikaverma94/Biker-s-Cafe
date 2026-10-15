@@ -6,7 +6,7 @@ import { rateLimit } from '../../lib/rateLimit';
 // Retrieve tickets: booking id + the phone used at booking.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!rateLimit(req, res, { key: 'booking', max: 10, windowMs: 10 * 60 * 1000 })) return;
+  if (!rateLimit(req, res, { key: 'booking', max: 60, windowMs: 10 * 60 * 1000 })) return;
   const bookingId = String(req.body.bookingId || '').trim().toUpperCase();
   const phone = String(req.body.phone || '').trim();
   try {

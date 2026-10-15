@@ -147,6 +147,28 @@ export default function Home() {
     }
   }
 
+  function showPaid(bid, tickets) {
+    // Same id the server uses, so Meta de-dupes the browser and server Purchase events.
+    trackStandardPixel('Purchase', `purchase_${bid}`, { value: total, currency: 'INR' });
+    setBookingId(bid);
+    setTicketSnapshot(tickets);
+    setStage('success');
+    setTimeout(() => setNotified(true), 1600);
+  }
+
+  // Asks the server whether this booking is paid (it may have been confirmed by the Razorpay webhook).
+  async function recoverBooking(bid, attempts) {
+    if (attempts > 1) setStage('processing');
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const res = await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingId: bid, phone }) });
+        if (res.ok) { const d = await res.json(); return showPaid(bid, d.tickets); }
+      } catch {}
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 3000));
+    }
+    setStage(attempts > 1 ? 'unconfirmed' : 'failed');
+  }
+
   function openRazorpay() {
     if (!orderInfo || typeof window === 'undefined' || !window.Razorpay) return;
     if (rzpOpenRef.current) return; // never open two checkout windows
@@ -162,33 +184,30 @@ export default function Home() {
       theme: { color: '#D0262C' },
       handler: async (response) => {
         setStage('processing');
+        const bid = orderInfo.bookingId;
         try {
           const { fbp, fbc } = fbCookies();
-          const purchaseEventId = genEventId('purchase');
           const res = await fetch('/api/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              bookingId,
+              bookingId: bid,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              fbEventId: purchaseEventId, fbp, fbc, leadId: leadIdRef.current,
+              fbp, fbc,
             }),
           });
           const data = await res.json();
           if (!res.ok || !data.ok) throw new Error(data.error || 'Verification failed');
-
-          trackStandardPixel('Purchase', purchaseEventId, { value: total, currency: 'INR' });
-          setTicketSnapshot(data.tickets);
-          setStage('success');
-          setTimeout(() => setNotified(true), 1600);
+          showPaid(bid, data.tickets);
         } catch (err) {
+          // The customer has paid: never show "failed". Keep checking until the server (webhook/reconcile) confirms.
           console.error(err);
-          setStage('failed');
+          await recoverBooking(bid, 12);
         }
       },
-      modal: { ondismiss: () => { rzpOpenRef.current = false; setStage('failed'); } },
+      modal: { ondismiss: () => { rzpOpenRef.current = false; recoverBooking(orderInfo.bookingId, 1); } },
     });
     rzp.on('payment.failed', () => { rzpOpenRef.current = false; setStage('failed'); });
     rzp.open();
@@ -216,7 +235,7 @@ export default function Home() {
   }
 
   const hasErrors = errors.length > 0;
-  const showCheckout = ['checkout', 'processing', 'failed'].includes(stage);
+  const showCheckout = ['checkout', 'processing', 'failed', 'unconfirmed'].includes(stage);
   const isChoosing = stage === 'checkout' || stage === 'failed';
   const showSuccess = stage === 'success';
 
@@ -531,7 +550,13 @@ export default function Home() {
                 </div>
               )}
               {stage === 'failed' && (
-                <div style={{ background: '#FDECEC', color: '#9B1C1C', borderRadius: 10, padding: '12px 14px', fontSize: 15 }}>Payment didn't go through. No money was deducted — please try again.</div>
+                <div style={{ background: '#FDECEC', color: '#9B1C1C', borderRadius: 10, padding: '12px 14px', fontSize: 15, lineHeight: 1.5 }}>Payment didn't complete. If money was deducted, <strong>please don't pay again</strong> — your pass is confirmed automatically within a few minutes{bookingId ? <> (booking <strong>{bookingId}</strong>)</> : null}. You can look it up any time at <a href="/my-booking">/my-booking</a>.</div>
+              )}
+              {stage === 'unconfirmed' && (
+                <div style={{ background: '#FFF6E0', color: '#7A5200', borderRadius: 10, padding: '14px', fontSize: 15, lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <span><strong>We received your payment and are confirming it.</strong> This can take a few minutes. Please don't pay again. Your passes will be emailed, and you can see them at <a href="/my-booking">/my-booking</a> with booking ID <strong>{bookingId}</strong> and your mobile number.</span>
+                  <button onClick={() => recoverBooking(bookingId, 12)} style={{ height: 44, border: 0, borderRadius: 10, background: '#2B6BEA', color: '#fff', font: "700 16px 'Mukta',sans-serif", cursor: 'pointer' }}>Check again</button>
+                </div>
               )}
               {isChoosing && (
                 <>

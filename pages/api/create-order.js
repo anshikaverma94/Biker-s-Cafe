@@ -2,6 +2,7 @@ import { getRazorpay } from '../../lib/razorpay';
 import { reserveBooking, setBookingOrderId, markBookingFailed, SeatsError } from '../../lib/db';
 import { computeTotals, sanitizeGuests, EVENT_DATE_SHORT } from '../../lib/config';
 import { rateLimit, clientIp } from '../../lib/rateLimit';
+import { logEvent, errInfo } from '../../lib/log';
 
 function rid(n) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -49,7 +50,9 @@ export default async function handler(req, res) {
         notes: { bookingId, eventDate, slotTime, phone, email },
       });
       await setBookingOrderId(bookingId, order.id);
+      await logEvent({ source: 'create-order', event: 'order_created', bookingId, orderId: order.id, detail: { amountPaise: totalPaise, guests: guests.length } });
     } catch (err) {
+      await logEvent({ source: 'create-order', event: 'order_failed', level: 'error', bookingId, detail: errInfo(err) });
       await markBookingFailed(bookingId).catch(() => {}); // release the held seats
       throw err;
     }

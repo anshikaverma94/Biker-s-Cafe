@@ -4,7 +4,7 @@
 var SECRET = 'replace-with-a-long-random-string'; // must match SHEETS_WEBHOOK_SECRET in .env.local
 
 var LEADS_HEADERS = ['Timestamp', 'Lead ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Count', 'Status'];
-var BOOKINGS_HEADERS = ['Timestamp', 'Booking ID', 'Order ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Name', 'Guest Age', 'Gender', 'Amount (Rs)', 'Status'];
+var BOOKINGS_HEADERS = ['Timestamp', 'Booking ID', 'Order ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Name', 'Guest Age', 'Gender', 'Amount (Rs)', 'Status', 'Payment ID'];
 
 function doPost(e) {
   var body;
@@ -60,7 +60,7 @@ function addBooking(body) {
     sh.appendRow([
       timestamp, body.bookingId || '', body.orderId || '', body.eventDate || '', body.slotTime || '',
       body.phone || '', body.email || '', g.name || '', g.age || '', g.gender || (g.isChild ? 'Child' : 'Adult'),
-      body.totalAmount || '', body.status || '',
+      body.totalAmount || '', body.status || '', body.paymentId || '',
     ]);
   }
   return jsonOutput({ ok: true });
