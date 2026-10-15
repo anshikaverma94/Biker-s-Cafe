@@ -74,7 +74,8 @@ export default async function handler(req, res) {
   const finalAmount = orderAmount;
 
   // Fire-and-forget side effects: a failure here must not block the paid confirmation.
-  appendBookingToSheet({
+  const sideEffects = [];
+  sideEffects.push(appendBookingToSheet({
     bookingId,
     orderId: razorpay_order_id,
     eventDate: justPaid?.event_date || eventDate,
@@ -84,11 +85,11 @@ export default async function handler(req, res) {
     totalAmount: finalAmount,
     status: 'paid',
     guests: guestRows.map((g) => ({ name: g.name, age: g.age, gender: g.gender })),
-  }).catch((e) => console.error('sheets append failed:', e));
+  }).catch((e) => console.error('sheets append failed:', e)));
 
-  markLeadConverted({ leadId, bookingId }).catch((e) => console.error('mark lead converted failed:', e));
+  sideEffects.push(markLeadConverted({ leadId: leadId || justPaid?.lead_id, bookingId }).catch((e) => console.error('mark lead converted failed:', e)));
 
-  sendServerEvent({
+  sideEffects.push(sendServerEvent({
     eventName: 'Purchase',
     eventId: fbEventId || `purchase_${bookingId}`,
     email: finalEmail,
@@ -99,7 +100,8 @@ export default async function handler(req, res) {
     userAgent: req.headers['user-agent'],
     fbp,
     fbc,
-  }).catch((e) => console.error('fb purchase event failed:', e));
+  }).catch((e) => console.error('fb purchase event failed:', e)));
+  await Promise.allSettled(sideEffects); // finish before responding so serverless doesn't cut them off
 
   await deliverTickets(bookingId);
   return res.status(200).json({ ok: true, bookingId, ticketCount: guestRows.length, tickets });
