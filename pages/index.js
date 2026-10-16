@@ -448,7 +448,7 @@ export default function Home() {
                   <span style={{ fontSize: 16, color: '#CFC4BC' }}>{EVENT_DATE_LONG}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 17 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Passes × {quantity} <span style={{ color: '#B4A79F' }}>@ <span style={{ textDecoration: 'line-through', color: '#D4AF37', fontWeight: 600 }}>₹{DISPLAY_ORIGINAL_PRICE}</span> ₹{PRICE}</span></span><span>{inr(subtotal)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}><span>Passes × {quantity} <span style={{ color: '#B4A79F' }}>@ <span style={{ textDecoration: 'line-through', color: '#B4A79F', fontSize: 14 }}>₹{DISPLAY_ORIGINAL_PRICE}</span></span> <span style={{ color: '#D4AF37', fontWeight: 700, fontSize: 19 }}>₹{PRICE}</span></span><span>{inr(subtotal)}</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#B4A79F', fontSize: 15 }}><span>GST (18%)</span><span>{inr(gst)}</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#B4A79F', fontSize: 15 }}><span>Convenience Fee</span><span>₹0</span></div>
                 </div>
