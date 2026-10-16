@@ -78,9 +78,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ received: true });
     }
 
-    const r = await finalizePaidBooking({ bookingId, orderId, paymentId: payment.id, source: 'webhook' });
-    await logEvent({ ...base, bookingId, event: 'processed', detail: { already: !!r.already, ok: r.ok } });
-    return res.status(200).json({ received: true });
+    // Razorpay gives up on a webhook that takes more than a few seconds, and finalising (Sheet, email,
+    // Facebook) can take ~5s. Acknowledge now; the work continues in this long-running server process
+    // and every step is logged. If saving the payment itself fails, the reconcile job picks it up.
+    res.status(200).json({ received: true });
+    finalizePaidBooking({ bookingId, orderId, paymentId: payment.id, source: 'webhook' }).then(
+      (r) => logEvent({ ...base, bookingId, event: 'processed', detail: { already: !!r.already, ok: r.ok } }),
+      (err) => logEvent({ ...base, bookingId, event: 'processing_error', level: 'error', detail: errInfo(err) })
+    );
+    return;
   } catch (err) {
     // 500 on purpose: Razorpay retries failed webhooks for ~24h, and finalize is idempotent.
     await logEvent({ ...base, event: 'processing_error', level: 'error', detail: errInfo(err) });
