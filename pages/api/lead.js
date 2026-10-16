@@ -1,4 +1,5 @@
 import { appendLeadToSheet } from '../../lib/sheets';
+import { sanitizeGuests } from '../../lib/config';
 import { rateLimit } from '../../lib/rateLimit';
 import { sendServerEvent } from '../../lib/fbConversions';
 
@@ -9,6 +10,7 @@ export default async function handler(req, res) {
   if (!rateLimit(req, res, { key: 'lead', max: 10, windowMs: 10 * 60 * 1000 })) return;
   const { leadId, eventDate, slotTime, phone, email, guestCount, guests, fbEventId, fbp, fbc } = req.body;
   if (!phone || !email) return res.status(400).json({ error: 'Missing contact details' });
+  const guests = sanitizeGuests(req.body.guests).guests || [];
 
   try {
     await appendLeadToSheet({ leadId, eventDate, slotTime, phone, email, guestCount, guests }).catch((e) =>

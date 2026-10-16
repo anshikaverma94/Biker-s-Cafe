@@ -42,3 +42,18 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS ip TEXT;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tickets_emailed_at TIMESTAMPTZ;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_bookings_created_at ON bookings(created_at);
+
+-- Durable audit trail of every payment-related step (webhook calls, confirmations, reconcile runs).
+CREATE TABLE IF NOT EXISTS payment_events (
+  id          BIGSERIAL PRIMARY KEY,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  source      TEXT NOT NULL,            -- webhook | verify | reconcile | create-order
+  event       TEXT NOT NULL,
+  level       TEXT NOT NULL DEFAULT 'info',
+  booking_id  TEXT,
+  order_id    TEXT,
+  payment_id  TEXT,
+  detail      JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_payment_events_booking ON payment_events(booking_id);
+CREATE INDEX IF NOT EXISTS idx_payment_events_created ON payment_events(created_at);
