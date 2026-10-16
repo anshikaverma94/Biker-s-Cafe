@@ -3,7 +3,7 @@
 
 var SECRET = 'replace-with-a-long-random-string'; // must match SHEETS_WEBHOOK_SECRET in .env.local
 
-var LEADS_HEADERS = ['Timestamp', 'Lead ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Count', 'Status'];
+var LEADS_HEADERS = ['Timestamp', 'Lead ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Count', 'Genders', 'Status'];
 var BOOKINGS_HEADERS = ['Timestamp', 'Booking ID', 'Order ID', 'Event Date', 'Slot', 'Phone', 'Email', 'Guest Name', 'Guest Age', 'Gender', 'Amount (Rs)', 'Status'];
 
 function doPost(e) {
@@ -28,6 +28,10 @@ function doPost(e) {
   }
 }
 
+// Creates the sheet with the given headers if it doesn't exist yet. If it
+// already exists, adds any headers from the list that are missing as new
+// columns at the end, so older sheets pick up new fields (like "Genders")
+// without anyone having to edit the sheet by hand.
 function getOrCreateSheet(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(name);
@@ -35,19 +39,53 @@ function getOrCreateSheet(name, headers) {
     sh = ss.insertSheet(name);
     sh.appendRow(headers);
     sh.setFrozenRows(1);
-  } else if (sh.getLastRow() === 0) {
+    return sh;
+  }
+  if (sh.getLastRow() === 0) {
     sh.appendRow(headers);
     sh.setFrozenRows(1);
+    return sh;
   }
+
+  var lastCol = sh.getLastColumn();
+  var existing = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  headers.forEach(function (h) {
+    if (existing.indexOf(h) === -1) {
+      lastCol += 1;
+      sh.getRange(1, lastCol).setValue(h);
+      existing.push(h);
+    }
+  });
   return sh;
+}
+
+// Builds a header-name -> value map into a row array matching the sheet's
+// actual current header order, so column position never has to be hardcoded.
+function rowFromMap(sh, map) {
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  return headers.map(function (h) { return map[h] !== undefined ? map[h] : ''; });
+}
+
+function colIndex(sh, headerName) {
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  return headers.indexOf(headerName) + 1; // 0 if not found
 }
 
 function addLead(body) {
   var sh = getOrCreateSheet('Leads', LEADS_HEADERS);
-  sh.appendRow([
-    new Date().toISOString(), body.leadId || '', body.eventDate || '', body.slotTime || '',
-    body.phone || '', body.email || '', body.guestCount || '', 'Filled - not paid',
-  ]);
+  var guests = body.guests || [];
+  var genders = guests.map(function (g) { return g.gender || ''; }).filter(String).join(', ');
+  sh.appendRow(rowFromMap(sh, {
+    'Timestamp': new Date().toISOString(),
+    'Lead ID': body.leadId || '',
+    'Event Date': body.eventDate || '',
+    'Slot': body.slotTime || '',
+    'Phone': body.phone || '',
+    'Email': body.email || '',
+    'Guest Count': body.guestCount || '',
+    'Genders': genders,
+    'Status': 'Filled - not paid',
+  }));
   return jsonOutput({ ok: true });
 }
 
@@ -57,11 +95,20 @@ function addBooking(body) {
   var guests = body.guests || [];
   for (var i = 0; i < guests.length; i++) {
     var g = guests[i];
-    sh.appendRow([
-      timestamp, body.bookingId || '', body.orderId || '', body.eventDate || '', body.slotTime || '',
-      body.phone || '', body.email || '', g.name || '', g.age || '', g.gender || (g.isChild ? 'Child' : 'Adult'),
-      body.totalAmount || '', body.status || '',
-    ]);
+    sh.appendRow(rowFromMap(sh, {
+      'Timestamp': timestamp,
+      'Booking ID': body.bookingId || '',
+      'Order ID': body.orderId || '',
+      'Event Date': body.eventDate || '',
+      'Slot': body.slotTime || '',
+      'Phone': body.phone || '',
+      'Email': body.email || '',
+      'Guest Name': g.name || '',
+      'Guest Age': g.age || '',
+      'Gender': g.gender || (g.isChild ? 'Child' : 'Adult'),
+      'Amount (Rs)': body.totalAmount || '',
+      'Status': body.status || '',
+    }));
   }
   return jsonOutput({ ok: true });
 }
@@ -69,10 +116,13 @@ function addBooking(body) {
 function markLeadConverted(body) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Leads');
   if (!sh) return jsonOutput({ ok: true }); // nothing to update yet, not an error
+  var leadIdCol = colIndex(sh, 'Lead ID');
+  var statusCol = colIndex(sh, 'Status');
+  if (!leadIdCol || !statusCol) return jsonOutput({ ok: true });
   var data = sh.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][1]) === String(body.leadId)) {
-      sh.getRange(i + 1, 8).setValue('Paid - booking ' + body.bookingId);
+    if (String(data[i][leadIdCol - 1]) === String(body.leadId)) {
+      sh.getRange(i + 1, statusCol).setValue('Paid - booking ' + body.bookingId);
       break;
     }
   }
