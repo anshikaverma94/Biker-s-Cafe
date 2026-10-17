@@ -64,14 +64,18 @@ export default function Home() {
     return null;
   };
 
+  // Group entry: males are welcome, but every group needs at least one female.
+  const groupNeedsWoman = entryType === 'group' && !people.some((g) => g.gender === 'Female');
+
   const isFormValid = useMemo(() => {
     if (people.length !== quantity || people.some(personProblem)) return false;
+    if (groupNeedsWoman) return false;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY || quantity > seatsLeft) return false;
     if (!/^[6-9]\d{9}$/.test(phone)) return false;
     if (!/^\S+@\S+\.\S+$/.test(email)) return false;
     if (!agree) return false;
     return true;
-  }, [people, quantity, seatsLeft, phone, email, agree]);
+  }, [people, quantity, seatsLeft, phone, email, agree, groupNeedsWoman]);
 
   // Fire the "details filled" Lead event once, the first time the whole form becomes valid.
   useEffect(() => {
@@ -101,6 +105,7 @@ export default function Home() {
       if (pr === 'age') e.push(who + 'this is a singles-only, 18+ event — enter a valid age.');
       if (pr === 'gender') e.push(who + 'select a gender.');
     });
+    if (groupNeedsWoman && people.every((g) => !personProblem(g))) e.push('Group entry needs at least one female. All-male groups are not allowed.');
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY) e.push(`Choose between 1 and ${MAX_QTY} passes.`);
     if (soldOut) e.push('Sold out.');
     else if (quantity > seatsLeft) e.push(`Only ${seatsLeft} passes left.`);
@@ -390,7 +395,7 @@ export default function Home() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Entry Type</span>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {[{ id: 'stag', label: 'Stag', sub: 'Females only' }, { id: 'group', label: 'Group', sub: 'Males welcome' }].map((t) => {
+                    {[{ id: 'stag', label: 'Stag', sub: 'Females only' }, { id: 'group', label: 'Group', sub: 'Males welcome, with at least 1 female' }].map((t) => {
                       const on = entryType === t.id;
                       return (
                         <button key={t.id} onClick={() => selectEntryType(t.id)} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${on ? '#B3242A' : '#D6C5B8'}`, background: on ? '#B3242A' : '#fff', color: on ? '#fff' : '#1E1A1B', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
@@ -402,6 +407,9 @@ export default function Home() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ width: 30, height: 30, borderRadius: '50%', background: '#141213', color: '#E8A07C', display: 'grid', placeItems: 'center', fontWeight: 700 }}>1</span><span style={{ fontSize: 20, fontWeight: 700 }}>{quantity > 1 ? 'Details of every guest' : 'Your details'}</span></div>
+                {entryType === 'group' && (
+                  <span style={{ fontSize: 13, color: groupNeedsWoman && people.every((g) => g.gender) ? '#B3242A' : '#6A5E5A' }}>Group entry: males are welcome, but at least one guest in the booking must be female.</span>
+                )}
                 {people.map((g, i) => (
                   <div key={i} style={{ background: '#FBF7F3', border: '1px solid #E3D7CD', borderRadius: 14, padding: 14, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                     {quantity > 1 && <div style={{ flex: '1 1 100%', fontSize: 14, fontWeight: 700, color: '#B3242A' }}>Guest {i + 1}{i === 0 ? ' (you)' : ''}</div>}
