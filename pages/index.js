@@ -12,7 +12,7 @@ const METHODS = [
 const inr = (n) => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function Home() {
-  const [people, setPeople] = useState([{ name: '', age: '', gender: '' }]);
+  const [people, setPeople] = useState([{ name: '', age: '', gender: 'Female' }]); // Stag (default) is females-only
   const [quantity, setQuantity] = useState(1);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -25,11 +25,11 @@ export default function Home() {
   const [notified, setNotified] = useState(false);
   const [seatsLeft, setSeatsLeft] = useState(TOTAL_SEATS);
   const [serverError, setServerError] = useState('');
-  const [maleLimitNotice, setMaleLimitNotice] = useState(false);
   const [entryType, setEntryType] = useState('stag'); // stag | group
   const leadFiredRef = useRef(false);
   const rzpOpenRef = useRef(false);
   const leadIdRef = useRef(null);
+  const errorsRef = useRef(null);
 
   const { subtotal, gst, total } = computeTotals(quantity);
 
@@ -41,13 +41,19 @@ export default function Home() {
 
   // One details row per pass: keep the array in step with the quantity.
   useEffect(() => {
-    setPeople((p) => Array.from({ length: quantity }, (_, i) => p[i] || { name: '', age: '', gender: '' }));
-  }, [quantity]);
+    setPeople((p) => Array.from({ length: quantity }, (_, i) => p[i] || { name: '', age: '', gender: entryType === 'stag' ? 'Female' : '' }));
+  }, [quantity]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // After a failed Pay attempt, bring the error list into view (on mobile the booking panel is far from the Pay bar).
+  useEffect(() => {
+    if (errors.length && errorsRef.current) errorsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [errors]);
 
   const updatePerson = (i, patch) => { setPeople((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x))); setErrors([]); };
   const selectEntryType = (type) => {
     setEntryType(type);
-    if (type === 'stag') setPeople((p) => p.map((x) => (x.gender === 'Male' ? { ...x, gender: '' } : x)));
+    // Stag = females only, so gender is fixed to Female. Group lets each guest choose.
+    if (type === 'stag') setPeople((p) => p.map((x) => ({ ...x, gender: 'Female' })));
     setErrors([]);
   };
   const personProblem = (g) => {
@@ -123,8 +129,8 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventDate: EVENT_DATE_SHORT, slotTime: '', phone, email,
-          guests: buildGuests(),
-                    leadId: leadIdRef.current,
+          guests: buildGuests(), entryType,
+          leadId: leadIdRef.current,
         }),
       });
       const data = await res.json();
@@ -226,7 +232,8 @@ export default function Home() {
 
   function resetAll() {
     setStage('form');
-    setPeople([{ name: '', age: '', gender: '' }]);
+    setEntryType('stag');
+    setPeople([{ name: '', age: '', gender: 'Female' }]);
     setQuantity(1);
     setAgree(false);
     setErrors([]);
@@ -383,7 +390,7 @@ export default function Home() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Entry Type</span>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {[{ id: 'stag', label: 'Stag', sub: 'Solo — females only' }, { id: 'group', label: 'Group', sub: 'Males welcome' }].map((t) => {
+                    {[{ id: 'stag', label: 'Stag', sub: 'Females only' }, { id: 'group', label: 'Group', sub: 'Males welcome' }].map((t) => {
                       const on = entryType === t.id;
                       return (
                         <button key={t.id} onClick={() => selectEntryType(t.id)} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${on ? '#B3242A' : '#D6C5B8'}`, background: on ? '#B3242A' : '#fff', color: on ? '#fff' : '#1E1A1B', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
@@ -408,20 +415,21 @@ export default function Home() {
                     </label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '2 1 220px', minWidth: 0 }}>
                       <span style={{ fontSize: 14, fontWeight: 600, color: '#6A5E5A' }}>Gender</span>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {GENDERS.map((opt) => {
-                          const on = g.gender === opt;
-                          return (
-                            <button
-                              key={opt}
-                              onClick={() => (opt === 'Male' && entryType !== 'group' ? setMaleLimitNotice(true) : updatePerson(i, { gender: opt }))}
-                              style={{ flex: 1, height: 48, borderRadius: 10, border: `1.5px solid ${on ? '#B3242A' : '#D6C5B8'}`, background: on ? '#B3242A' : '#fff', color: on ? '#fff' : '#1E1A1B', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}
-                            >
-                              {opt}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      {entryType === 'stag' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <button type="button" disabled style={{ height: 48, borderRadius: 10, border: '1.5px solid #B3242A', background: '#B3242A', color: '#fff', fontWeight: 600, fontSize: 15, cursor: 'not-allowed', opacity: .85 }}>Female</button>
+                          <span style={{ fontSize: 12, color: '#6A5E5A' }}>Stag entry is females only. Choose Group for male guests.</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          {GENDERS.map((opt) => {
+                            const on = g.gender === opt;
+                            return (
+                              <button key={opt} type="button" onClick={() => updatePerson(i, { gender: opt })} style={{ flex: 1, height: 48, borderRadius: 10, border: `1.5px solid ${on ? '#B3242A' : '#D6C5B8'}`, background: on ? '#B3242A' : '#fff', color: on ? '#fff' : '#1E1A1B', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>{opt}</button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -476,7 +484,7 @@ export default function Home() {
                   <span style={{ fontFamily: "'Rozha One',serif", fontSize: 40, color: '#E8A07C', lineHeight: 1 }}>{inr(total)}</span>
                 </div>
                 {hasErrors && (
-                  <div style={{ background: '#3A1A1B', border: '1px solid #D0262C', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 15, color: '#FFDAD6' }}>
+                  <div ref={errorsRef} style={{ background: '#3A1A1B', border: '1px solid #D0262C', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 15, color: '#FFDAD6' }}>
                     {errors.map((e, i) => <span key={i}>• {e}</span>)}
                   </div>
                 )}
@@ -595,17 +603,6 @@ export default function Home() {
               )}
               <span style={{ fontSize: 13, color: '#8A90A0', textAlign: 'center' }}>Secured by Razorpay Standard Checkout</span>
             </div>
-          </div>
-        </div>
-      )}
-
-      {maleLimitNotice && (
-        <div data-noprint="1" style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(10,9,9,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setMaleLimitNotice(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(100%,380px)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,.45)', color: '#1E1A1B', padding: 24, display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-            <span style={{ fontSize: 40 }}>🚫</span>
-            <span style={{ fontSize: 19, fontWeight: 700 }}>Stag male entry is sold out</span>
-            <span style={{ fontSize: 15, color: '#6A5E5A' }}>Solo (stag) male passes have hit their limit for this event. Switch to <strong>Group</strong> entry at the top to book for a male guest.</span>
-            <button onClick={() => setMaleLimitNotice(false)} style={{ height: 48, border: 0, borderRadius: 10, background: '#B3242A', color: '#fff', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Got it</button>
           </div>
         </div>
       )}

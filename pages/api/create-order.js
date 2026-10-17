@@ -1,6 +1,6 @@
 import { getRazorpay } from '../../lib/razorpay';
 import { reserveBooking, setBookingOrderId, markBookingFailed, SeatsError } from '../../lib/db';
-import { computeTotals, sanitizeGuests, EVENT_DATE_SHORT } from '../../lib/config';
+import { computeTotals, sanitizeGuests, ENTRY_TYPES, EVENT_DATE_SHORT } from '../../lib/config';
 import { rateLimit, clientIp } from '../../lib/rateLimit';
 import { logEvent, errInfo } from '../../lib/log';
 
@@ -21,7 +21,8 @@ export default async function handler(req, res) {
     if (!/^[6-9]\d{9}$/.test(String(phone || '')) || !/^\S+@\S+\.\S+$/.test(String(email || '')) || String(email).length > 200) {
       return res.status(400).json({ error: 'Invalid phone or email' });
     }
-    const cleaned = sanitizeGuests(req.body.guests);
+    const entryType = ENTRY_TYPES.includes(req.body.entryType) ? req.body.entryType : 'stag'; // unknown -> strictest
+    const cleaned = sanitizeGuests(req.body.guests, entryType);
     if (cleaned.error) return res.status(400).json({ error: cleaned.error });
     const guests = cleaned.guests;
     // Price is always computed here; any amount sent by the client is ignored.
