@@ -615,7 +615,7 @@ export default function Home() {
               <h2 style={{ margin: 0, fontFamily: "'Rozha One',serif", fontWeight: 400, fontSize: 'clamp(36px,6vw,64px)', lineHeight: 1 }}>See you on the dance floor!</h2>
               <p style={{ margin: 0, fontSize: 18, color: '#DDD3CB' }}>Booking <strong style={{ color: '#E8A07C' }}>{bookingId}</strong> · {ticketSnapshot.length} {ticketSnapshot.length === 1 ? 'pass' : 'passes'} for {EVENT_DATE_LONG}</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
-                <button onClick={() => window.print()} style={{ height: 52, padding: '0 26px', border: 0, borderRadius: 999, background: '#E8A07C', color: '#141213', font: "700 17px 'Mukta',sans-serif", cursor: 'pointer' }}>Download passes (PDF)</button>
+                <button onClick={() => { const prevTitle = document.title; document.title = EVENT_NAME; window.print(); setTimeout(() => { document.title = prevTitle; }, 0); }} style={{ height: 52, padding: '0 26px', border: 0, borderRadius: 999, background: '#E8A07C', color: '#141213', font: "700 17px 'Mukta',sans-serif", cursor: 'pointer' }}>Download passes (PDF)</button>
                 <button onClick={resetAll} style={{ height: 52, padding: '0 26px', border: '1.5px solid #E8A07C', borderRadius: 999, background: 'transparent', color: '#E8A07C', font: "600 17px 'Mukta',sans-serif", cursor: 'pointer' }}>Book another pass</button>
               </div>
             </div>
